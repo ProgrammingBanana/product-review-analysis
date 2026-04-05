@@ -59,14 +59,13 @@ All scripts print progress through every stage: collection → normalization →
 
 ## Output
 
-Each scraper writes two files to the current directory:
+Each scraper writes csv files to the current directory:
 
 ```
 {APP_NAME}_reviews_sample_{YYYY-MM-DD}.csv
-{APP_NAME}_reviews_sample_{YYYY-MM-DD}.xlsx
 ```
 
-The CSV uses UTF-8 with BOM encoding so it opens correctly in Excel on Windows without garbled characters. Both files share the same columns:
+The CSV uses UTF-8 with BOM encoding so it opens correctly in Excel on Windows without garbled characters. These are the columns it contains:
 
 | Column | Description |
 |---|---|
@@ -89,5 +88,5 @@ Collect
   → Filter: reviews containing at least one keyword
   → Stratified sample (by star rating × platform, up to 150 reviews)
   → Anonymize reviewer identities
-  → Export CSV + Excel
+  → Export CSV
 ```
