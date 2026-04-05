@@ -111,34 +111,31 @@ def normalize(raw_reviews):
     """
     Map raw iTunes RSS feed entries to the shared normalized schema.
 
-    iTunes RSS JSON keys are nested dicts with a '$text' leaf for values,
-    e.g. entry['im:rating']['$text']. Reviews without text content are
+    iTunes RSS JSON keys are nested dicts with a 'label' leaf for values,
+    e.g. entry['im:rating']['label']. Reviews without text content are
     dropped. The 'country' key was added during collection.
     """
     normalized = []
     for r in raw_reviews:
-        text = (r.get("content", {}).get("$text") or "").strip()
+        text = (r.get("content", {}).get("label") or "").strip()
         if not text:
             continue
 
-        raw_date = (r.get("updated", {}).get("$text") or
-                    r.get("im:voteCount", {}).get("$text") or "")
-        # 'updated' is the reliable date field
-        raw_date = r.get("updated", {}).get("$text", "")
+        raw_date = r.get("updated", {}).get("label", "")
 
         try:
-            rating = int(r.get("im:rating", {}).get("$text", 0))
+            rating = int(r.get("im:rating", {}).get("label", 0))
         except (ValueError, TypeError):
             rating = None
 
         normalized.append({
-            "review_id":   r.get("id", {}).get("$text", ""),
+            "review_id":   r.get("id", {}).get("label", ""),
             "platform":    "app_store",
             "country":     r.get("country", ""),
             "star_rating": rating,
             "date":        _parse_date(raw_date),
             "text":        text,
-            "author":      r.get("author", {}).get("name", {}).get("$text", ""),
+            "author":      r.get("author", {}).get("name", {}).get("label", ""),
             "sort_order":  "",
         })
 

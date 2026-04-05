@@ -5,9 +5,10 @@ HCI needfinding project — app store review collector.
 ## File structure
 
 ```
-shared.py            # CONFIG + shared pipeline functions (imported by both scrapers)
-scraper_play.py      # Google Play collector — run independently
-scraper_appstore.py  # Apple App Store collector — run independently
+shared.py            # CONFIG + shared pipeline functions (imported by everything)
+scraper_play.py      # Google Play collector — standalone or used by run_all.py
+scraper_appstore.py  # Apple App Store collector — standalone or used by run_all.py
+run_all.py           # Orchestrator — collects both platforms, merges, single export
 ```
 
 ## Setup
@@ -37,21 +38,24 @@ The other variables (`COUNTRIES`, `KEYWORDS`, `MONTHS_BACK`, etc.) are pre-confi
 - **Google Play package ID**: open the app's Play Store page in a browser; the ID is the `id=` parameter in the URL (e.g. `https://play.google.com/store/apps/details?id=com.zhiliaoapp.musically`).
 - **Apple App Store numeric ID**: open the app's App Store page in a browser; the numeric ID appears in the URL after `/id` (e.g. `https://apps.apple.com/us/app/tiktok/id835599320` → ID is `835599320`).
 
-## Running the scrapers
+## Running
 
-Run each scraper independently. Both read CONFIG from `shared.py`.
-
-**Google Play:**
+**Normal use — collect both platforms and produce one combined file:**
 ```bash
-pipenv run python scraper_play.py
+pipenv run python run_all.py
 ```
 
-**Apple App Store:**
+This collects from Google Play and the App Store, merges the results, then runs the full pipeline once so the stratified sample is balanced across both platforms together.
+
+**If one platform fails or you only need one source:**
 ```bash
+pipenv run python scraper_play.py
 pipenv run python scraper_appstore.py
 ```
 
-Each scraper prints progress through every stage: collection → normalization → deduplication → date filter → keyword filter → stratified sample → anonymize → export.
+Each scraper runs the full pipeline independently and writes its own output file.
+
+All scripts print progress through every stage: collection → normalization → deduplication → date filter → keyword filter → stratified sample → anonymize → export.
 
 ## Output
 

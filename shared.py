@@ -32,7 +32,7 @@ KEYWORDS = [
 ]
 
 MONTHS_BACK        = 24    # How many months back to collect reviews
-TARGET_SAMPLE_SIZE = 150   # Target number of reviews in the final sample
+TARGET_SAMPLE_SIZE = 300   # Target number of reviews in the final sample
 PLAY_PAGES         = 30    # Pages per sort order for Google Play (~200 reviews/page)
 RATE_LIMIT_SECONDS = 1.5   # Pause between paginated requests (seconds)
 
@@ -149,24 +149,43 @@ def stratified_sample(reviews, target_size):
         key = (r.get("star_rating"), r.get("platform"))
         strata.setdefault(key, []).append(r)
 
-    sampled = {}
-    remaining_target = target_size
-    unfilled = dict(strata)
+    # Phase 1: iteratively fix strata that are smaller than their proportional
+    # share, redistributing their unused quota to the remaining strata.
+    # Each iteration removes at least one stratum from `free`, so the loop
+    # always terminates.
+    quota = target_size
+    fixed = {}          # key -> final count (stratum exhausted)
+    free  = dict(strata)
 
-    while unfilled:
-        pool_total = sum(len(v) for v in unfilled.values())
-        next_unfilled = {}
-        for key, pool in unfilled.items():
-            alloc = math.floor(len(pool) / pool_total * remaining_target)
-            alloc = min(alloc, len(pool))
-            sampled[key] = pool[:alloc]
-            if alloc < len(pool):
-                next_unfilled[key] = pool
-        remaining_target = target_size - sum(len(v) for v in sampled.values())
-        if not next_unfilled or remaining_target <= 0:
+    while free:
+        free_total = sum(len(v) for v in free.values())
+        newly_fixed = {
+            k: len(v)
+            for k, v in free.items()
+            if math.floor(len(v) / free_total * quota) >= len(v)
+        }
+        if not newly_fixed:
             break
-        unfilled = next_unfilled
+        for k, n in newly_fixed.items():
+            fixed[k] = n
+            quota -= n
+            del free[k]
 
+    # Phase 2: distribute remaining quota across free strata using floor
+    # allocation + largest-remainder method to avoid rounding drift.
+    if free:
+        free_total = sum(len(v) for v in free.values())
+        raw    = {k: len(v) / free_total * quota for k, v in free.items()}
+        floors = {k: math.floor(v) for k, v in raw.items()}
+        remainder = quota - sum(floors.values())
+        for k in sorted(free, key=lambda k: raw[k] - floors[k], reverse=True):
+            if remainder <= 0:
+                break
+            floors[k] += 1
+            remainder -= 1
+        fixed.update(floors)
+
+    sampled = {k: strata[k][: fixed.get(k, 0)] for k in strata}
     result = [r for items in sampled.values() for r in items]
 
     print("  Sample composition:")
@@ -203,16 +222,12 @@ def export(reviews, app_name):
 
     df = pd.DataFrame(reviews, columns=columns)
 
-    csv_path   = f"{base}.csv"
-    excel_path = f"{base}.xlsx"
-
+    csv_path = f"{base}.csv"
     df.to_csv(csv_path, index=False, encoding="utf-8-sig")
-    df.to_excel(excel_path, index=False, engine="openpyxl")
 
     print(f"  Exported {len(df)} rows:")
-    print(f"    CSV:   {csv_path}")
-    print(f"    Excel: {excel_path}\n")
-    return csv_path, excel_path
+    print(f"    CSV: {csv_path}\n")
+    return csv_path
 
 
 def run_pipeline(reviews, platform_label, app_name,
